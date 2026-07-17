@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>深渊融合 · Abyssal Fusion</title>
+<style>
+:root {
+  --cell: 95px;
+  --gap: 8px;
+  --grid: calc(var(--cell) * 4 + var(--gap) * 5);
+  --bg: #0a0a14;
+  --surface: #141428;
+  --text: #c8c8e0;
+  --accent: #7b5cff;
+  --gold: #ffd700;
+  --danger: #ff4050;
+  --heal: #40f0a0;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#bg-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#game-wrapper {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 480px;
+  width: 100%;
+  padding: 12px;
+}
+
+.screen { width: 100%; }
+.hidden { display: none !important; }
+
+/* Title Screen */
+#title-screen {
+  text-align: center;
+  padding: 40px 20px;
+  animation: fadeInUp 0.8s ease-out;
+}
+#title-screen h1 {
+  font-size: 3em;
+  font-weight: 900;
+  background: linear-gradient(135deg, #7b5cff, #c040ff, #ff6040);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+  margin-bottom: 8px;
+  letter-spacing: 4px;
+}
+#title-screen .subtitle {
+  color: #8888aa;
+  font-size: 0.95em;
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+#title-screen .subtitle span {
+  color: #c0a0ff;
+}
+.btn {
+  background: linear-gradient(135deg, #5b3cdf, #7b5cff);
+  color: #fff;
+  border: none;
+  padding: 14px 48px;
+  font-size: 1.1em;
+  font-weight: 700;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 24px rgba(123, 92, 255, 0.35);
+  letter-spacing: 2px;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: 0 6px 32px rgba(123, 92, 255, 0.5); }
+.btn:active { transform: scale(0.96); }
+
+/* Game Screen */
+#game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-radius: 12px;
+  border: 1px solid rgba(123, 92, 255, 0.2);
+}
+.header-item {
+  font-size: 0.85em;
+  color: #8888aa;
+}
+.header-item span {
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.15em;
+}
+.hp-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hp-bar-bg {
+  width: 100px;
+  height: 14px;
+  background: #2a2a40;
+  border-radius: 7px;
+  overflow: hidden;
+  border: 1px solid rgba(123, 92, 255, 0.3);
+}
+.hp-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ff4050, #ff6040);
+  border-radius: 7px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#hp-text { font-size: 0.8em; color: #ff8060; font-weight: 600; min-width: 55px; }
+#shield-indicator {
+  font-size: 0.75em;
+  color: #80c0ff;
+  font-weight: 700;
+  animation: fadeInUp 0.3s ease-out;
+  white-space: nowrap;
+}
+#shield-indicator span { margin-left: 2px; }
+
+/* Enemy Area */
+#enemy-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-radius: 12px;
+  border: 1px solid rgba(200, 60, 60, 0.25);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+#enemy-area.attacking {
+  border-color: rgba(255, 60, 60, 0.6);
+  box-shadow: 0 0 20px rgba(255, 60, 60, 0.2);
+  animation: enemyShake 0.3s ease-out;
+}
+#enemy-sprite {
+  width: 56px; height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2em;
+  background: linear-gradient(135deg, #2a1a2a, #1a1a30);
+  border: 2px solid rgba(200, 60, 60, 0.4);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+#enemy-sprite.hit { animation: enemyHitFlash 0.25s ease-out; }
+#enemy-info { flex: 1; }
+#enemy-name { font-weight: 700; font-size: 0.95em; margin-bottom: 4px; color: #e0a0a0; }
+.enemy-hp-bg { width: 100%; height: 12px; }
+.enemy-hp { background: linear-gradient(90deg, #e04040, #f06040); }
+#enemy-intent {
+  margin-top: 4px;
+  font-size: 0.78em;
+  color: #ff8080;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Grid */
+#grid-container {
+  position: relative;
+  width: var(--grid);
+  height: var(--grid);
+  background: rgba(20, 20, 40, 0.8);
+  border-radius: 14px;
+  border: 2px solid rgba(123, 92, 255, 0.25);
+  box-shadow: 0 0 40px rgba(123, 92, 255, 0.08), inset 0 0 60px rgba(0, 0, 0, 0.3);
+}
+#grid-bg {
+  display: grid;
+  grid-template: repeat(4, var(--cell)) / repeat(4, var(--cell));
+  gap: var(--gap);
+  padding: var(--gap);
+  width: 100%; height: 100%;
+}
+#grid-bg .cell-bg {
+  background: rgba(30, 30, 55, 0.5);
+  border-radius: 10px;
+  border: 1px solid rgba(123, 92, 255, 0.12);
+  transition: background 0.3s;
+}
+#tiles-layer {
+  position: absolute;
+  top: var(--gap); left: var(--gap);
+  width: calc(var(--cell) * 4 + var(--gap) * 3);
+  height: calc(var(--cell) * 4 + var(--gap) * 3);
+  pointer-events: none;
+}
+.tile {
+  position: absolute;
+  width: var(--cell);
+  height: var(--cell);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.4em;
+  color: #fff;
+  transition: left 0.12s cubic-bezier(0.22, 0.61, 0.36, 1), top 0.12s cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: left, top, transform;
+  z-index: 1;
+}
+.tile.merge-pop {
+  animation: mergePop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 5;
+}
+.tile.new-tile {
+  animation: tileAppear 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.tile.v2  { background: linear-gradient(135deg, #252545, #2a2a50); box-shadow: 0 2px 8px rgba(100,100,200,0.2); color: #a0a0d0; font-size:1.3em; }
+.tile.v4  { background: linear-gradient(135deg, #252545, #2a2a55); box-shadow: 0 2px 10px rgba(100,100,220,0.3); color: #9090e0; font-size:1.3em; }
+.tile.v8  { background: linear-gradient(135deg, #1e1e40, #2a2a60); box-shadow: 0 3px 12px rgba(80,80,220,0.4); color: #8080f0; }
+.tile.v16 { background: linear-gradient(135deg, #1e1e40, #3030a0); box-shadow: 0 3px 14px rgba(70,70,240,0.45); color: #7070ff; }
+.tile.v32 { background: linear-gradient(135deg, #1a1a40, #4040c0); box-shadow: 0 4px 16px rgba(60,60,255,0.5); color: #6060ff; }
+.tile.v64 { background: linear-gradient(135deg, #2a1a3a, #6030a0); box-shadow: 0 4px 18px rgba(160,60,200,0.5); color: #b060e0; }
+.tile.v128{ background: linear-gradient(135deg, #2a1a3a, #8020a0); box-shadow: 0 4px 20px rgba(180,40,200,0.55); color: #c040d0; }
+.tile.v256{ background: linear-gradient(135deg, #2a1030, #a020a0); box-shadow: 0 5px 22px rgba(200,30,180,0.55); color: #d040c0; }
+.tile.v512{ background: linear-gradient(135deg, #2a1010, #c03020); box-shadow: 0 5px 24px rgba(240,60,40,0.55); color: #ff6040; }
+.tile.v1024{background: linear-gradient(135deg, #2a1010, #e02010); box-shadow: 0 5px 26px rgba(255,40,30,0.6); color: #ff4030; }
+.tile.v2048{background: linear-gradient(135deg, #1a1000, #c08000); box-shadow: 0 6px 30px rgba(255,180,0,0.65); color: #ffd700; font-size:1.2em; }
+.tile.v4096,.tile.v8192,.tile.v16384{background: linear-gradient(135deg, #0a0a00, #b09000); box-shadow:0 6px 34px rgba(255,200,0,0.7); color:#ffd700; font-size:1.05em; }
+
+/* Relics Bar */
+#relic-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+  min-height: 28px;
+}
+.relic-chip {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.72em;
+  font-weight: 600;
+  border: 1px solid;
+  animation: fadeInUp 0.3s ease-out;
+  white-space: nowrap;
+}
+.relic-chip.crimson { background: rgba(255,60,40,0.15); border-color: rgba(255,60,40,0.4); color: #ff8060; }
+.relic-chip.frost   { background: rgba(60,180,255,0.15); border-color: rgba(60,180,255,0.4); color: #80c0ff; }
+.relic-chip.void    { background: rgba(180,60,255,0.15); border-color: rgba(180,60,255,0.4); color: #c080ff; }
+
+/* Relic Selection Screen */
+#relic-screen {
+  text-align: center;
+  padding: 20px 12px;
+  animation: fadeInUp 0.4s ease-out;
+}
+#relic-screen h2 {
+  font-size: 1.5em;
+  margin-bottom: 4px;
+  color: #c0a0ff;
+}
+#relic-screen .floor-clear-text {
+  color: #8888aa;
+  font-size: 0.85em;
+  margin-bottom: 16px;
+}
+#relic-cards {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.relic-card {
+  width: 130px;
+  padding: 18px 12px;
+  background: var(--surface);
+  border-radius: 14px;
+  border: 2px solid rgba(123, 92, 255, 0.2);
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  text-align: center;
+  animation: cardSlideIn 0.5s ease-out both;
+}
+.relic-card:nth-child(1) { animation-delay: 0.05s; }
+.relic-card:nth-child(2) { animation-delay: 0.15s; }
+.relic-card:nth-child(3) { animation-delay: 0.25s; }
+.relic-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(180, 140, 255, 0.6);
+  box-shadow: 0 8px 28px rgba(123, 92, 255, 0.3);
+}
+.relic-card:active { transform: scale(0.94); }
+.relic-card .card-icon { font-size: 2.2em; margin-bottom: 6px; }
+.relic-card .card-name { font-weight: 700; font-size: 0.9em; margin-bottom: 4px; }
+.relic-card .card-desc { font-size: 0.72em; color: #8888aa; line-height: 1.4; }
+.relic-card .card-path {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.65em;
+  font-weight: 700;
+  margin-top: 8px;
+}
+.card-path.crimson { background: rgba(255,60,40,0.2); color: #ff8060; }
+.card-path.frost   { background: rgba(60,180,255,0.2); color: #80c0ff; }
+.card-path.void    { background: rgba(180,60,255,0.2); color: #c080ff; }
+
+/* Game Over Screen */
+#gameover-screen {
+  text-align: center;
+  padding: 30px 20px;
+  animation: fadeInUp 0.6s ease-out;
+}
+#gameover-screen h2 { font-size: 1.6em; color: #ff6040; margin-bottom: 6px; }
+#gameover-stats { margin: 16px 0; font-size: 0.9em; color: #8888aa; line-height: 2; }
+#gameover-stats b { color: #c0a0ff; }
+
+/* Damage Numbers */
+#damage-layer {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 100;
+}
+.dmg-num {
+  position: absolute;
+  font-weight: 900;
+  font-size: 1.2em;
+  pointer-events: none;
+  animation: dmgFloat 1s ease-out forwards;
+  text-shadow: 0 0 8px currentColor;
+}
+.dmg-num.player-dmg { color: #ff4050; }
+.dmg-num.enemy-dmg { color: #ffd700; }
+.dmg-num.heal { color: #40f0a0; }
+.dmg-num.shield-pop { color: #80c0ff; }
+
+/* Screen Shake */
+.shake { animation: screenShake 0.35s ease-out; }
+
+/* Keyframes */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes mergePop {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.3); }
+  60% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+@keyframes tileAppear {
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes enemyHitFlash {
+  0% { transform: scale(1.15); filter: brightness(2); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+@keyframes enemyShake {
+  0%,100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+@keyframes dmgFloat {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  40% { opacity: 1; transform: translateY(-30px) scale(1.3); }
+  100% { opacity: 0; transform: translateY(-70px) scale(0.8); }
+}
+@keyframes screenShake {
+  0%,100% { transform: translate(0); }
+  10% { transform: translate(-4px, 2px); }
+  20% { transform: translate(4px, -1px); }
+  30% { transform: translate(-2px, -3px); }
+  40% { transform: translate(3px, 1px); }
+  50% { transform: translate(-1px, -2px); }
+  60% { transform: translate(2px, 3px); }
+  70% { transform: translate(-3px, 1px); }
+  80% { transform: translate(1px, -1px); }
+  90% { transform: translate(-2px, 2px); }
+}
+@keyframes cardSlideIn {
+  from { opacity: 0; transform: translateY(30px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(255,200,0,0.4); }
+  50% { box-shadow: 0 0 0 12px rgba(255,200,0,0); }
+}
+@keyframes glowPulse {
+  0%,100% { box-shadow: 0 0 20px rgba(123,92,255,0.1); }
+  50% { box-shadow: 0 0 40px rgba(123,92,255,0.2); }
+}
+#grid-container { animation: glowPulse 3s ease-in-out infinite; }
+
+/* Responsive */
+@media (max-width: 440px) {
+  :root { --cell: 76px; --gap: 6px; }
+  .relic-card { width: 105px; padding: 14px 8px; }
+  #title-screen h1 { font-size: 2.2em; }
+  #enemy-sprite { width: 44px; height: 44px; font-size: 1.5em; }
+}
+@media (max-width: 350px) {
+  :root { --cell: 66px; --gap: 5px; }
+  .relic-card { width: 90px; padding: 10px 6px; font-size: 0.75em; }
+  .tile { font-size: 1.1em; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div id="game-wrapper">
+  <!-- Title Screen -->
+  <div id="title-screen" class="screen">
+    <h1>深渊融合</h1>
+    <p class="subtitle">
+      滑屏合并符文，击溃深渊中的怪物<br>
+      在<span>烈焰</span>·<span>冰霜</span>·<span>虚空</span>三条道路中构筑你的力量
+    </p>
+    <button class="btn" id="start-btn">踏入深渊</button>
+  </div>
+
+  <!-- Game Screen -->
+  <div id="game-screen" class="screen hidden">
+    <div id="game-header">
+      <div class="header-item">层数 <span id="floor-num">1</span></div>
+      <div class="header-item">得分 <span id="score-num">0</span></div>
+      <div class="header-item">击杀 <span id="kills-num">0</span></div>
+      <div class="hp-container">
+        <span id="shield-indicator" style="display:none">🛡️<span id="shield-val">0</span></span>
+        <div class="hp-bar-bg"><div id="hp-bar" class="hp-bar" style="width:100%"></div></div>
+        <span id="hp-text">100/100</span>
+      </div>
+    </div>
+
+    <div id="enemy-area">
+      <div id="enemy-sprite">👾</div>
+      <div id="enemy-info">
+        <div id="enemy-name">虚空史莱姆</div>
+        <div class="hp-bar-bg enemy-hp-bg"><div id="enemy-hp-bar" class="hp-bar enemy-hp" style="width:100%"></div></div>
+        <div id="enemy-intent">⏳ 准备中...</div>
+      </div>
+    </div>
+
+    <div id="grid-container">
+      <div id="grid-bg"></div>
+      <div id="tiles-layer"></div>
+    </div>
+
+    <div id="relic-bar"></div>
+  </div>
+
+  <!-- Relic Selection -->
+  <div id="relic-screen" class="screen hidden">
+    <h2>🗡️ 层数突破！</h2>
+    <p class="floor-clear-text">选择一件遗物，永久强化你的力量</p>
+    <div id="relic-cards"></div>
+  </div>
+
+  <!-- Game Over -->
+  <div id="gameover-screen" class="screen hidden">
+    <h2>深渊吞噬了你</h2>
+    <div id="gameover-stats"></div>
+    <button class="btn" id="restart-btn">再次挑战</button>
+  </div>
+</div>
+
+<div id="damage-layer"></div>
+
+<script>
+// ==================== Audio Engine ====================
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+}
+
+function playTone(freq, type, duration, vol = 0.08, glide = 0) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t);
+  if (glide) osc.frequency.linearRampToValueAtTime(freq + glide, t + duration);
+  gain.gain.setValueAtTime(vol, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + duration);
+}
+
+function sfxMove() { playTone(200, 'sine', 0.06, 0.04); }
+function sfxMerge(v) {
+  const base = Math.min(600 + Math.log2(v) * 80, 1200);
+  playTone(base, 'triangle', 0.15, 0.07, 200);
+  playTone(base * 1.5, 'sine', 0.1, 0.04);
+}
+function sfxHit() { playTone(80, 'sawtooth', 0.2, 0.06); }
+function sfxClear() {
+  playTone(400, 'triangle', 0.12, 0.06);
+  setTimeout(() => playTone(600, 'triangle', 0.12, 0.06), 100);
+  setTimeout(() => playTone(800, 'triangle', 0.15, 0.06), 200);
+}
+function sfxDeath() {
+  playTone(200, 'sawtooth', 0.3, 0.06, -100);
+  setTimeout(() => playTone(100, 'sawtooth', 0.4, 0.08, -50), 200);
+}
+
+// ==================== Particle Engine ====================
+const bgCanvas = document.getElementById('bg-canvas');
+const bgCtx = bgCanvas.getContext('2d');
+let particles = [];
+let bgParticles = [];
+
+function resizeCanvas() {
+  bgCanvas.width = window.innerWidth;
+  bgCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function spawnBgParticles() {
+  for (let i = 0; i < 30; i++) {
+    bgParticles.push({
+      x: Math.random() * bgCanvas.width,
+      y: Math.random() * bgCanvas.height,
+      r: Math.random() * 2 + 0.5,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: -Math.random() * 0.5 - 0.1,
+      alpha: Math.random() * 0.4 + 0.1,
+      life: Math.random() * 300 + 200,
+      maxLife: 500
+    });
+  }
+}
+spawnBgParticles();
+
+function spawnParticles(x, y, color, count = 12, speed = 3) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * speed * 30;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * dist * 0.5,
+      vy: Math.sin(angle) * dist * 0.5,
+      r: Math.random() * 3 + 1,
+      color,
+      alpha: 1,
+      life: Math.random() * 25 + 15,
+      maxLife: 40
+    });
+  }
+}
+
+function updateParticles() {
+  bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+  // Background particles
+  for (let i = bgParticles.length - 1; i >= 0; i--) {
+    const p = bgParticles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+    if (p.life <= 0 || p.y < -20 || p.y > bgCanvas.height + 20) {
+      p.x = Math.random() * bgCanvas.width;
+      p.y = bgCanvas.height + 20;
+      p.life = p.maxLife;
+    }
+    bgCtx.beginPath();
+    bgCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    bgCtx.fillStyle = `rgba(123, 92, 255, ${p.alpha * (p.life / p.maxLife)})`;
+    bgCtx.fill();
+  }
+
+  // FX particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+    p.alpha = p.life / p.maxLife;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    bgCtx.beginPath();
+    bgCtx.arc(p.x, p.y, p.r * p.alpha, 0, Math.PI * 2);
+    bgCtx.fillStyle = p.color.replace('1)', `${p.alpha})`);
+    bgCtx.fill();
+  }
+}
+
+function animateParticles() {
+  updateParticles();
+  requestAnimationFrame(animateParticles);
+}
+animateParticles();
+
+// ==================== Damage Numbers ====================
+const damageLayer = document.getElementById('damage-layer');
+
+function showDamage(x, y, value, cls = 'enemy-dmg') {
+  const el = document.createElement('div');
+  el.className = `dmg-num ${cls}`;
+  el.textContent = (value >= 0 ? '' : '') + Math.abs(Math.round(value));
+  if (value > 0 && cls === 'enemy-dmg') el.textContent = '-' + el.textContent;
+  if (value < 0 && cls === 'player-dmg') el.textContent = '-' + Math.abs(Math.round(value));
+  if (cls === 'heal') el.textContent = '+' + Math.round(value);
+
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  damageLayer.appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+}
+
+// ==================== Screen Shake ====================
+const gameWrapper = document.getElementById('game-wrapper');
+function screenShake(intensity = 1) {
+  gameWrapper.classList.remove('shake');
+  void gameWrapper.offsetWidth;
+  gameWrapper.style.setProperty('--shake-intensity', intensity);
+  gameWrapper.classList.add('shake');
+}
+
+// ==================== Game State ====================
+const state = {
+  grid: [],         // 2D: grid[row][col] = {id, value, el} | null
+  tiles: new Map(), // id → tile
+  nextId: 0,
+  score: 0,
+  floor: 1,
+  kills: 0,
+  hp: 100,
+  maxHp: 100,
+  shield: 0,
+  relics: [],
+  relicIds: new Set(),
+  turnCount: 0,
+  moveCountThisFloor: 0,
+  mergeCountThisFloor: 0,
+  mergeCountTotal: 0,
+  damageMult: 1,
+  enemy: null,
+  gameState: 'title',
+  animating: false,
+  inputLocked: false,
+  novasQueued: 0,
+  hadLethalSave: false,
+};
+
+// ==================== DOM Refs ====================
+const $ = id => document.getElementById(id);
+const titleScreen = $('title-screen');
+const gameScreen = $('game-screen');
+const relicScreen = $('relic-screen');
+const gameoverScreen = $('gameover-screen');
+const gridBg = $('grid-bg');
+const tilesLayer = $('tiles-layer');
+const relicBar = $('relic-bar');
+const relicCards = $('relic-cards');
+const enemySprite = $('enemy-sprite');
+const enemyName = $('enemy-name');
+const enemyHpBar = $('enemy-hp-bar');
+const enemyIntent = $('enemy-intent');
+const scoreNum = $('score-num');
+const floorNum = $('floor-num');
+const killsNum = $('kills-num');
+const hpBar = $('hp-bar');
+const hpText = $('hp-text');
+const gameoverStats = $('gameover-stats');
+
+// Build grid background cells
+function buildGridBg() {
+  gridBg.innerHTML = '';
+  for (let i = 0; i < 16; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell-bg';
+    gridBg.appendChild(cell);
+  }
+}
+buildGridBg();
+
+// ==================== 2048 Engine ====================
+function initGrid() {
+  state.grid = Array.from({length: 4}, () => Array(4).fill(null));
+  state.tiles.clear();
+  state.nextId = 0;
+  tilesLayer.innerHTML = '';
+}
+
+function createTileElement(value) {
+  const el = document.createElement('div');
+  el.className = 'tile';
+  const vClass = 'v' + (value <= 16384 ? value : 16384);
+  el.classList.add(vClass);
+  el.textContent = value;
+  return el;
+}
+
+function addTileToGrid(value, row, col) {
+  if (state.grid[row][col] !== null) return null;
+  const id = state.nextId++;
+  const el = createTileElement(value);
+  const step = getCellSize();
+  el.style.left = (col * step) + 'px';
+  el.style.top = (row * step) + 'px';
+  el.classList.add('new-tile');
+  const tile = { id, value, row, col, el };
+  state.grid[row][col] = tile;
+  state.tiles.set(id, tile);
+  tilesLayer.appendChild(el);
+  return tile;
+}
+
+function getCellSize() {
+  const style = getComputedStyle(document.documentElement);
+  return parseInt(style.getPropertyValue('--cell')) + parseInt(style.getPropertyValue('--gap'));
+}
+
+function positionTile(tile) {
+  const step = getCellSize();
+  tile.el.style.left = (tile.col * step) + 'px';
+  tile.el.style.top = (tile.row * step) + 'px';
+}
+
+function refreshAllTilePositions() {
+  for (const tile of state.tiles.values()) positionTile(tile);
+}
+
+function spawnTile() {
+  const empty = [];
+  for (let r = 0; r < 4; r++)
+    for (let c = 0; c < 4; c++)
+      if (!state.grid[r][c]) empty.push({r, c});
+  if (empty.length === 0) return null;
+
+  let value = Math.random() < 0.85 ? 2 : 4;
+
+  if (state.relicIds.has('dark_seed') && Math.random() < 0.12) value = 8;
+  if (state.relicIds.has('void_echo') && Math.random() < 0.08) value = 16;
+
+  const pos = empty[Math.floor(Math.random() * empty.length)];
+  return addTileToGrid(value, pos.r, pos.c);
+}
+
+function canMove() {
+  for (let r = 0; r < 4; r++)
+    for (let c = 0; c < 4; c++) {
+      if (!state.grid[r][c]) return true;
+      if (c < 3 && state.grid[r][c] && state.grid[r][c+1] && state.grid[r][c].value === state.grid[r][c+1].value) return true;
+      if (r < 3 && state.grid[r][c] && state.grid[r+1][c] && state.grid[r][c].value === state.grid[r+1][c].value) return true;
+    }
+  return false;
+}
+
+function moveGrid(direction) {
+  // 0=up, 1=right, 2=down, 3=left — compact→merge→compact per row/col
+  const isH = (direction === 1 || direction === 3); // horizontal
+  const rev = (direction === 1 || direction === 2); // right or down → reverse
+  const merges = [];
+  const newGrid = Array.from({length: 4}, () => Array(4).fill(null));
+
+  for (let m = 0; m < 4; m++) {
+    // Collect non-null tiles in traversal order
+    const line = [];
+    for (let s = 0; s < 4; s++) {
+      const idx = rev ? 3 - s : s;
+      const r = isH ? m : idx, c = isH ? idx : m;
+      if (state.grid[r][c]) line.push({ id: state.grid[r][c].id, val: state.grid[r][c].value });
+    }
+
+    if (line.length === 0) continue;
+
+    // Merge adjacent equal values (left to right for non-rev, but we always process 0→n)
+    const merged = [];
+    let i = 0;
+    while (i < line.length) {
+      if (i + 1 < line.length && line[i].val === line[i + 1].val) {
+        merged.push({ val: line[i].val * 2, ids: [line[i].id, line[i + 1].id], isMerge: true });
+        i += 2;
+      } else {
+        merged.push({ val: line[i].val, ids: [line[i].id], isMerge: false });
+        i++;
+      }
+    }
+
+    // Place in grid at edge
+    for (let j = 0; j < merged.length; j++) {
+      const posIdx = rev ? 3 - j : j;
+      const r = isH ? m : posIdx, c = isH ? posIdx : m;
+
+      if (merged[j].isMerge) {
+        const newId = state.nextId++;
+        newGrid[r][c] = { id: newId, value: merged[j].val, row: r, col: c, _merged: true };
+        merges.push({ value: merged[j].val, row: r, col: c, fromIds: merged[j].ids, newId });
+      } else {
+        newGrid[r][c] = { id: merged[j].ids[0], value: merged[j].val, row: r, col: c };
+      }
+    }
+  }
+
+  // Detect change
+  let changed = merges.length > 0;
+  if (!changed) {
+    for (let r = 0; r < 4; r++)
+      for (let c = 0; c < 4; c++) {
+        const nt = newGrid[r][c], ot = state.grid[r][c];
+        if ((nt === null) !== (ot === null)) { changed = true; break; }
+        if (nt && ot && nt.id !== ot.id) { changed = true; break; }
+      }
+  }
+  return changed ? { grid: newGrid, merges } : null;
+}
+
+// ==================== UI Update Helpers ====================
+function updateHP() {
+  const pct = Math.max(0, state.hp / state.maxHp * 100);
+  hpBar.style.width = pct + '%';
+  hpText.textContent = Math.max(0, Math.round(state.hp)) + '/' + state.maxHp;
+
+  const si = $('shield-indicator');
+  if (state.shield > 0) {
+    si.style.display = '';
+    $('shield-val').textContent = state.shield;
+  } else {
+    si.style.display = 'none';
+  }
+
+  if (state.hp <= 20) {
+    hpBar.style.background = 'linear-gradient(90deg, #ff2030, #ff4050)';
+  } else if (state.hp <= 50) {
+    hpBar.style.background = 'linear-gradient(90deg, #ff6030, #ff8040)';
+  } else {
+    hpBar.style.background = 'linear-gradient(90deg, #ff4050, #ff6040)';
+  }
+}
+
+function updateEnemyHP() {
+  if (!state.enemy) return;
+  const pct = Math.max(0, state.enemy.hp / state.enemy.maxHp * 100);
+  enemyHpBar.style.width = pct + '%';
+}
+
+function updateScore() {
+  scoreNum.textContent = state.score;
+  floorNum.textContent = state.floor;
+  killsNum.textContent = state.kills;
+}
+
+function updateRelicBar() {
+  relicBar.innerHTML = state.relics.map(r =>
+    `<span class="relic-chip ${r.path}">${r.icon} ${r.name}</span>`
+  ).join('');
+}
+
+// ==================== Enemy System ====================
+const ENEMY_POOL = [
+  // Floor template: {name, emoji, hp, atk, interval, special, specialDesc}
+  { name: '虚空史莱姆', emoji: '👾', hp: 45, atk: 6, interval: 4, special: null, specialDesc: null, intentIcon: '🗡️' },
+  { name: '骨铠骑士', emoji: '💀', hp: 70, atk: 10, interval: 3, special: 'block', specialDesc: '偶尔格挡一次合并伤害', intentIcon: '⚔️' },
+  { name: '暗影编织者', emoji: '🕷️', hp: 100, atk: 14, interval: 3, special: 'curse', specialDesc: '诅咒最弱的符文使其减半', intentIcon: '🕸️' },
+  { name: '深渊炎魔', emoji: '🔥', hp: 150, atk: 20, interval: 2, special: 'burn', specialDesc: '每回合灼烧你 3 点生命', intentIcon: '🔥' },
+  { name: '虚空领主', emoji: '👁️', hp: 220, atk: 26, interval: 2, special: 'chaos', specialDesc: '随机打乱你的符文位置', intentIcon: '🌀' },
+];
+
+function createEnemy(floor) {
+  const idx = Math.min(floor - 1, ENEMY_POOL.length - 1);
+  const base = ENEMY_POOL[idx];
+
+  // Scale beyond pool
+  let scale = 1;
+  if (floor > ENEMY_POOL.length) {
+    const extra = floor - ENEMY_POOL.length;
+    scale = 1 + extra * 0.35;
+  }
+
+  return {
+    name: floor > ENEMY_POOL.length ? base.name + ' ' + '★'.repeat(floor - ENEMY_POOL.length + 1) : base.name,
+    emoji: base.emoji,
+    hp: Math.round(base.hp * scale),
+    maxHp: Math.round(base.hp * scale),
+    atk: Math.round(base.atk * scale),
+    interval: Math.max(2, base.interval - Math.floor((floor - 1) / 5)),
+    special: base.special,
+    specialDesc: base.specialDesc,
+    intentIcon: base.intentIcon,
+    turnsUntilAttack: base.interval,
+    attackedThisTurn: false,
+  };
+}
+
+function spawnEnemy() {
+  state.enemy = createEnemy(state.floor);
+  enemySprite.textContent = state.enemy.emoji;
+  enemyName.textContent = state.enemy.name;
+  updateEnemyHP();
+  updateEnemyIntent();
+  state.turnCount = 0;
+  state.moveCountThisFloor = 0;
+  state.mergeCountThisFloor = 0;
+}
+
+function updateEnemyIntent() {
+  if (!state.enemy) return;
+  const e = state.enemy;
+  if (e.turnsUntilAttack <= 0) {
+    enemyIntent.innerHTML = `<span>${e.intentIcon} 攻击！造成 <b style="color:#ff6040">${e.atk}</b> 伤害</span>`;
+  } else {
+    enemyIntent.innerHTML = `<span>⏳ ${e.turnsUntilAttack} 回合后攻击</span>`;
+  }
+}
+
+function dealDamageToEnemy(dmg) {
+  if (!state.enemy) return;
+  let actualDmg = dmg;
+
+  // Block check
+  if (state.enemy.special === 'block' && !state.enemy.attackedThisTurn && Math.random() < 0.25) {
+    actualDmg = 0;
+    enemyIntent.innerHTML = '<span>🛡️ 格挡！</span>';
+    setTimeout(() => updateEnemyIntent(), 800);
+  }
+
+  state.enemy.hp -= actualDmg;
+  if (state.enemy.hp < 0) state.enemy.hp = 0;
+  state.enemy.attackedThisTurn = true;
+  updateEnemyHP();
+
+  if (actualDmg > 0) {
+    // Show damage number near enemy
+    const enemyRect = $('enemy-area').getBoundingClientRect();
+    showDamage(enemyRect.left + enemyRect.width / 2, enemyRect.top + 20, actualDmg, 'enemy-dmg');
+    enemySprite.classList.remove('hit');
+    void enemySprite.offsetWidth;
+    enemySprite.classList.add('hit');
+  }
+
+  if (state.enemy.hp <= 0) {
+    clearFloor();
+  }
+}
+
+function enemyAttack() {
+  if (!state.enemy) return;
+  const e = state.enemy;
+  const rawDmg = e.atk;
+  let actualDmg = rawDmg;
+
+  // Shield absorbs damage
+  if (state.shield > 0) {
+    const absorbed = Math.min(state.shield, actualDmg);
+    state.shield -= absorbed;
+    actualDmg -= absorbed;
+    showDamage(window.innerWidth / 2, window.innerHeight / 2 - 80, absorbed, 'shield-pop');
+  }
+
+  // Frost: freeze chance
+  const hasFreeze = state.relicIds.has('glacial_prison');
+  if (hasFreeze && Math.random() < 0.2) {
+    enemyIntent.innerHTML = '<span>❄️ 冻结！跳过攻击</span>';
+    setTimeout(() => updateEnemyIntent(), 800);
+    sfxMove();
+    return;
+  }
+
+  state.hp -= actualDmg;
+  if (state.hp <= 0) {
+    // Phoenix Feather check
+    if (state.relicIds.has('phoenix_feather') && !state.hadLethalSave) {
+      state.hp = 1;
+      state.hadLethalSave = true;
+      state.shield = 20;
+      showDamage(window.innerWidth / 2, window.innerHeight / 2 - 120, 0, 'heal');
+      updateHP();
+      enemyIntent.innerHTML = '<span>🪶 凤凰羽毛救了你一命！+20 护盾</span>';
+    } else {
+      state.hp = 0;
+      updateHP();
+      gameOver();
+      return;
+    }
+  }
+
+  updateHP();
+  const gameRect = $('game-screen').getBoundingClientRect();
+  showDamage(gameRect.left + gameRect.width / 2, gameRect.top + 80, actualDmg, 'player-dmg');
+
+  // Enemy area flash
+  const enemyArea = $('enemy-area');
+  enemyArea.classList.remove('attacking');
+  void enemyArea.offsetWidth;
+  enemyArea.classList.add('attacking');
+
+  screenShake(actualDmg / 10);
+  sfxHit();
+}
+
+function enemySpecialAction() {
+  if (!state.enemy || !state.enemy.special) return;
+  const e = state.enemy;
+
+  // Collect all current tiles
+  const allTiles = [];
+  for (let r = 0; r < 4; r++)
+    for (let c = 0; c < 4; c++)
+      if (state.grid[r][c]) allTiles.push(state.grid[r][c]);
+
+  if (allTiles.length === 0) return;
+
+  switch (e.special) {
+    case 'curse': {
+      // Halve the lowest value tile
+      allTiles.sort((a, b) => a.value - b.value);
+      const target = allTiles[0];
+      if (target.value > 2) {
+        const oldVal = target.value;
+        target.value = Math.max(2, Math.floor(target.value / 2));
+        target.el.textContent = target.value;
+        // Update class
+        target.el.className = 'tile';
+        target.el.classList.add('v' + target.value);
+        target.el.style.animation = 'none';
+        void target.el.offsetWidth;
+        target.el.style.animation = '';
+        spawnParticles(
+          target.el.getBoundingClientRect().left + 40,
+          target.el.getBoundingClientRect().top + 40,
+          'rgba(180,40,180,1)', 10, 2
+        );
+        showDamage(
+          target.el.getBoundingClientRect().left + 40,
+          target.el.getBoundingClientRect().top,
+          oldVal - target.value, 'player-dmg'
+        );
+      }
+      break;
+    }
+    case 'burn': {
+      const burnDmg = 3;
+      state.hp -= burnDmg;
+      updateHP();
+      showDamage(window.innerWidth / 2, window.innerHeight / 2 - 100, burnDmg, 'player-dmg');
+      break;
+    }
+    case 'chaos': {
+      // Shuffle all tile positions
+      const positions = allTiles.map(t => ({ row: t.row, col: t.col }));
+      // Fisher-Yates shuffle positions
+      for (let i = positions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [positions[i], positions[j]] = [positions[j], positions[i]];
+      }
+      for (let i = 0; i < allTiles.length; i++) {
+        allTiles[i].row = positions[i].row;
+        allTiles[i].col = positions[i].col;
+        state.grid[positions[i].row][positions[i].col] = allTiles[i];
+      }
+      refreshAllTilePositions();
+      screenShake(0.5);
+      break;
+    }
+  }
+}
+
+function defeatEnemy() {
+  state.kills++;
+  state.enemy = null;
+  enemySprite.textContent = '💀';
+  enemyHpBar.style.width = '0%';
+  enemyName.textContent = '已击败';
+  enemyIntent.innerHTML = '<span>✨ 选择遗物继续深入</span>';
+  sfxClear();
+  updateScore();
+  showRelicSelection();
+}
+
+function clearFloor() {
+  defeatEnemy();
+}
+
+// ==================== Relic System ====================
+const RELIC_POOL = {
+  crimson: [
+    { id: 'burning_fury',   name: '燃烧之怒',   icon: '🔥', path: 'crimson', desc: '合并伤害 <b>+30%</b>' },
+    { id: 'inferno_nova',   name: '地狱新星',   icon: '💥', path: 'crimson', desc: '每 <b>5</b> 次合并触发范围伤害 30' },
+    { id: 'phoenix_feather',name: '凤凰羽毛',   icon: '🪶', path: 'crimson', desc: '受到致命伤害时 <b>免死一次</b>，+20护盾' },
+    { id: 'rage_chain',     name: '愤怒连锁',   icon: '⛓️', path: 'crimson', desc: '连续合并同一数值 <b>伤害翻倍</b>' },
+    { id: 'molten_core',    name: '熔火之心',   icon: '🌋', path: 'crimson', desc: '所有攻击附带 <b>5</b> 点灼烧伤害/回合' },
+  ],
+  frost: [
+    { id: 'frozen_bulwark', name: '冰霜壁垒',   icon: '🛡️', path: 'frost', desc: '每 3 回合获得 <b>8</b> 点护盾' },
+    { id: 'glacial_prison', name: '冰川囚笼',   icon: '❄️', path: 'frost', desc: '<b>20%</b> 概率冻结敌人跳过攻击' },
+    { id: 'crystal_mend',   name: '水晶愈合',   icon: '💎', path: 'frost', desc: '每层开始时回复 <b>15%</b> 最大生命' },
+    { id: 'frostbite',      name: '霜寒噬咬',   icon: '🥶', path: 'frost', desc: '敌人每回合受到 <b>4%</b> 当前生命伤害' },
+    { id: 'permafrost',     name: '永冻领域',   icon: '🧊', path: 'frost', desc: '冻结时额外造成 <b>25</b> 点伤害' },
+  ],
+  void: [
+    { id: 'void_echo',      name: '虚空回响',   icon: '🌌', path: 'void', desc: '新符文 <b>8%</b> 概率为 16' },
+    { id: 'umbral_shift',   name: '暗影步',     icon: '🌑', path: 'void', desc: '合并后 <b>25%</b> 概率获得额外一步' },
+    { id: 'entropy_leech',  name: '熵能汲取',   icon: '🩸', path: 'void', desc: '造成伤害的 <b>12%</b> 转化为生命' },
+    { id: 'dark_seed',      name: '黑暗种子',   icon: '🌱', path: 'void', desc: '新符文 <b>12%</b> 概率为 8' },
+    { id: 'reality_tear',   name: '现实撕裂',   icon: '⚡', path: 'void', desc: '<b>10%</b> 概率使合并值翻倍（×4）' },
+  ],
+};
+
+function getRelicChoices() {
+  const choices = [];
+  const paths = ['crimson', 'frost', 'void'];
+
+  for (const path of paths) {
+    const pool = RELIC_POOL[path].filter(r => !state.relicIds.has(r.id));
+    if (pool.length === 0) {
+      // Give a generic bonus if pool exhausted
+      choices.push({
+        id: path + '_echo_' + state.floor,
+        name: path === 'crimson' ? '烈焰精华' : path === 'frost' ? '冰霜精华' : '虚空精华',
+        icon: path === 'crimson' ? '🔥' : path === 'frost' ? '❄️' : '🌌',
+        path,
+        desc: '所有伤害 <b>+8%</b>',
+      });
+    } else {
+      choices.push(pool[Math.floor(Math.random() * pool.length)]);
+    }
+  }
+  return choices;
+}
+
+function showRelicSelection() {
+  state.gameState = 'relic';
+  state.inputLocked = true;
+
+  const choices = getRelicChoices();
+  relicCards.innerHTML = '';
+
+  choices.forEach((relic, i) => {
+    const card = document.createElement('div');
+    card.className = 'relic-card';
+    card.innerHTML = `
+      <div class="card-icon">${relic.icon}</div>
+      <div class="card-name">${relic.name}</div>
+      <div class="card-desc">${relic.desc}</div>
+      <span class="card-path ${relic.path}">${relic.path === 'crimson' ? '烈焰之道' : relic.path === 'frost' ? '冰霜之道' : '虚空之道'}</span>
+    `;
+    card.addEventListener('click', () => selectRelic(relic));
+    relicCards.appendChild(card);
+  });
+
+  gameScreen.classList.add('hidden');
+  relicScreen.classList.remove('hidden');
+}
+
+function selectRelic(relic) {
+  state.relics.push(relic);
+  state.relicIds.add(relic.id);
+  applyRelic(relic);
+  updateRelicBar();
+
+  relicScreen.classList.add('hidden');
+  gameScreen.classList.remove('hidden');
+  state.inputLocked = false;
+
+  // Next floor
+  state.floor++;
+  startFloor();
+}
+
+function applyRelic(relic) {
+  switch (relic.id) {
+    case 'burning_fury':
+      state.damageMult += 0.3;
+      break;
+    case 'frozen_bulwark':
+      // Handled per-turn
+      break;
+    case 'crystal_mend':
+      state.hp = Math.min(state.maxHp, state.hp + state.maxHp * 0.15);
+      updateHP();
+      break;
+    case 'molten_core':
+      // Handled in enemy special phase
+      break;
+    // Most relics are checked at runtime by looking up relicIds
+  }
+}
+
+function applyTurnRelics() {
+  // Frozen Bulwark
+  if (state.relicIds.has('frozen_bulwark') && state.turnCount % 3 === 0 && state.turnCount > 0) {
+    state.shield += 8;
+    showDamage(window.innerWidth / 2, window.innerHeight / 2 - 60, 8, 'shield-pop');
+  }
+
+  // Frostbite
+  if (state.relicIds.has('frostbite') && state.enemy && state.enemy.hp > 0) {
+    const dot = Math.ceil(state.enemy.hp * 0.04);
+    state.enemy.hp -= dot;
+    updateEnemyHP();
+    if (state.enemy.hp <= 0) {
+      state.enemy.hp = 0;
+      clearFloor();
+    }
+  }
+
+  // Molten Core
+  if (state.relicIds.has('molten_core') && state.enemy && state.enemy.hp > 0) {
+    state.enemy.hp -= 5;
+    updateEnemyHP();
+    if (state.enemy.hp <= 0) {
+      state.enemy.hp = 0;
+      clearFloor();
+    }
+  }
+}
+
+// ==================== Game Flow ====================
+function startGame() {
+  initAudio();
+  initGrid();
+  state.score = 0;
+  state.floor = 1;
+  state.kills = 0;
+  state.hp = 100;
+  state.maxHp = 100;
+  state.shield = 0;
+  state.relics = [];
+  state.relicIds = new Set();
+  state.turnCount = 0;
+  state.moveCountThisFloor = 0;
+  state.mergeCountThisFloor = 0;
+  state.mergeCountTotal = 0;
+  state.damageMult = 1;
+  state.hadLethalSave = false;
+  state.inputLocked = false;
+  state.animating = false;
+
+  updateHP();
+  updateScore();
+  updateRelicBar();
+
+  titleScreen.classList.add('hidden');
+  gameoverScreen.classList.add('hidden');
+  relicScreen.classList.add('hidden');
+  gameScreen.classList.remove('hidden');
+  state.gameState = 'playing';
+
+  startFloor();
+}
+
+function startFloor() {
+  initGrid();
+  spawnTile();
+  spawnTile();
+  spawnEnemy();
+  updateScore();
+  updateHP();
+  updateRelicBar();
+  document.getElementById('enemy-hp-bar').style.width = '100%';
+}
+
+// ==================== Turn Processing ====================
+function processTurn(movePerformed) {
+  if (!movePerformed || state.gameState !== 'playing') return;
+
+  state.turnCount++;
+  state.moveCountThisFloor++;
+
+  // Inferno Nova: track cumulative merges for nova trigger
+  if (state.relicIds.has('inferno_nova')) {
+    state._novaCounter = (state._novaCounter || 0) + state._mergeDelta;
+    while (state._novaCounter >= 5 && state.enemy && state.enemy.hp > 0) {
+      state._novaCounter -= 5;
+      const novaDmg = 30;
+      state.enemy.hp -= novaDmg;
+      updateEnemyHP();
+      spawnParticles(window.innerWidth / 2, window.innerHeight / 2 - 80, 'rgba(255,120,40,1)', 25, 5);
+      showDamage(window.innerWidth / 2, window.innerHeight / 2 - 80, novaDmg, 'enemy-dmg');
+      screenShake(1.5);
+      if (state.enemy.hp <= 0) { state.enemy.hp = 0; clearFloor(); return; }
+    }
+  }
+  state._mergeDelta = 0;
+
+  if (!state.enemy) return;
+
+  // Enemy turn
+  state.enemy.turnsUntilAttack--;
+  updateEnemyIntent();
+
+  if (state.enemy.turnsUntilAttack <= 0) {
+    enemyAttack();
+    if (state.hp <= 0 || !state.enemy) return;
+    enemySpecialAction();
+    state.enemy.turnsUntilAttack = state.enemy.interval;
+    state.enemy.attackedThisTurn = false;
+    updateEnemyIntent();
+  }
+
+  applyTurnRelics();
+  if (!state.enemy) return;
+
+  // Grid stuck → clear & punish
+  if (!canMove()) {
+    const allTiles = [];
+    for (let r = 0; r < 4; r++)
+      for (let c = 0; c < 4; c++)
+        if (state.grid[r][c]) allTiles.push(state.grid[r][c]);
+
+    const shuffled = allTiles.sort(() => Math.random() - 0.5);
+    for (let i = 0; i < Math.min(2, shuffled.length); i++) {
+      const t = shuffled[i];
+      if (state.tiles.has(t.id)) {
+        t.el.remove();
+        state.tiles.delete(t.id);
+        state.grid[t.row][t.col] = null;
+      }
+    }
+    spawnTile();
+    spawnTile();
+    state.hp -= 5;
+    updateHP();
+  }
+}
+
+// ==================== Input Handling ====================
+let touchStartX = 0, touchStartY = 0;
+const SWIPE_THRESHOLD = 30;
+
+function handleMove(direction) {
+  if (state.inputLocked || state.animating) return;
+  if (state.gameState !== 'playing' || !state.enemy) return;
+
+  // Pre-move snapshot: count how many merges this move will create
+  const result = moveGrid(direction);
+  if (!result) return; // nothing moved
+
+  state.animating = true;
+  state._mergeDelta = result.merges.length;
+  const mergeSet = new Set(result.merges.map(m => `${m.row},${m.col}`));
+
+  // Phase 1: animate all existing tiles to their new positions
+  const idsToRemove = new Set();
+  for (const m of result.merges) {
+    for (const fid of m.fromIds) {
+      idsToRemove.add(fid);
+      const tile = state.tiles.get(fid);
+      if (tile) {
+        tile.row = m.row; tile.col = m.col;
+        positionTile(tile);
+      }
+    }
+  }
+
+  // Animate non-merged tiles
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      const nt = result.grid[r][c];
+      if (!nt || mergeSet.has(`${r},${c}`)) continue;
+      const tile = state.tiles.get(nt.id);
+      if (tile && (tile.row !== r || tile.col !== c)) {
+        tile.row = r; tile.col = c;
+        positionTile(tile);
+      }
+    }
+  }
+
+  sfxMove();
+
+  // Phase 2: after slide animation, finalize grid
+  setTimeout(() => {
+    // Remove merged source tiles
+    for (const id of idsToRemove) {
+      const tile = state.tiles.get(id);
+      if (tile) { tile.el.remove(); state.tiles.delete(id); }
+    }
+
+    // Clear grid
+    for (let r = 0; r < 4; r++)
+      for (let c = 0; c < 4; c++)
+        state.grid[r][c] = null;
+
+    // Place tiles from new grid
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        const nt = result.grid[r][c];
+        if (!nt) continue;
+
+        let tile = state.tiles.get(nt.id);
+        if (tile) {
+          tile.row = r; tile.col = c;
+          state.grid[r][c] = tile;
+        } else {
+          // New merged tile
+          let finalValue = nt.value;
+          if (state.relicIds.has('reality_tear') && Math.random() < 0.1) finalValue *= 2;
+
+          const el = createTileElement(finalValue);
+          const step = getCellSize();
+          el.style.left = (c * step) + 'px';
+          el.style.top = (r * step) + 'px';
+          el.classList.add('merge-pop');
+          tilesLayer.appendChild(el);
+
+          tile = { id: state.nextId++, value: finalValue, row: r, col: c, el };
+          state.grid[r][c] = tile;
+          state.tiles.set(tile.id, tile);
+
+          state.mergeCountThisFloor++;
+          state.mergeCountTotal++;
+
+          // Merge FX
+          const gridRect = $('grid-container').getBoundingClientRect();
+          const cs = step;
+          const x = gridRect.left + c * cs + cs / 2;
+          const y = gridRect.top + r * cs + cs / 2;
+          spawnParticles(x, y, 'rgba(180,130,255,1)', 14, Math.log2(nt.value));
+          sfxMerge(nt.value);
+        }
+      }
+    }
+
+    // Calculate total damage from merges
+    let totalDmg = 0;
+    for (const m of result.merges) {
+      let val = m.value;
+      if (state.relicIds.has('reality_tear') && Math.random() < 0.1) val *= 2;
+      totalDmg += Math.round(val * state.damageMult);
+    }
+
+    if (totalDmg > 0 && state.enemy) {
+      dealDamageToEnemy(totalDmg);
+      if (state.relicIds.has('entropy_leech')) {
+        const heal = Math.round(totalDmg * 0.12);
+        state.hp = Math.min(state.maxHp, state.hp + heal);
+        updateHP();
+        showDamage(window.innerWidth / 2, window.innerHeight / 2 - 140, heal, 'heal');
+      }
+      if (totalDmg >= 50) screenShake(Math.min(totalDmg / 80, 3));
+    }
+
+    // Spawn new tile
+    spawnTile();
+    updateScore();
+
+    // Umbral Shift: chance for extra move
+    if (state.relicIds.has('umbral_shift') && Math.random() < 0.25) {
+      state.animating = false;
+      processTurn(true);
+    } else {
+      state.animating = false;
+      processTurn(true);
+    }
+  }, 130);
+}
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (state.gameState === 'title') {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      startGame();
+      return;
+    }
+    return;
+  }
+  if (state.gameState === 'gameover') {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      startGame();
+      return;
+    }
+    return;
+  }
+  if (state.gameState !== 'playing') return;
+
+  const map = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3, w: 0, W: 0, d: 1, D: 1, s: 2, S: 2, a: 3, A: 3 };
+  if (map[e.key] !== undefined) {
+    e.preventDefault();
+    handleMove(map[e.key]);
+  }
+});
+
+// Touch
+const gridContainer = document.getElementById('grid-container');
+
+gridContainer.addEventListener('touchstart', e => {
+  if (state.gameState !== 'playing') return;
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+gridContainer.addEventListener('touchend', e => {
+  if (state.gameState !== 'playing') return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  const absDx = Math.abs(dx);
+  const absDy = Math.abs(dy);
+
+  if (Math.max(absDx, absDy) < SWIPE_THRESHOLD) return;
+
+  let dir;
+  if (absDx > absDy) {
+    dir = dx > 0 ? 1 : 3; // right : left
+  } else {
+    dir = dy > 0 ? 2 : 0; // down : up
+  }
+  handleMove(dir);
+});
+
+// Allow swipe on entire game screen (more forgiving)
+$('game-screen').addEventListener('touchstart', e => {
+  if (state.gameState !== 'playing') return;
+  if (e.target.closest('#relic-bar') || e.target.closest('#game-header') || e.target.closest('#enemy-area')) return;
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+$('game-screen').addEventListener('touchend', e => {
+  if (state.gameState !== 'playing') return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  const absDx = Math.abs(dx);
+  const absDy = Math.abs(dy);
+
+  if (Math.max(absDx, absDy) < SWIPE_THRESHOLD) return;
+
+  let dir;
+  if (absDx > absDy) {
+    dir = dx > 0 ? 1 : 3;
+  } else {
+    dir = dy > 0 ? 2 : 0;
+  }
+  handleMove(dir);
+});
+
+// Buttons
+$('start-btn').addEventListener('click', startGame);
+$('restart-btn').addEventListener('click', startGame);
+
+// ==================== Game Over ====================
+function gameOver() {
+  state.gameState = 'gameover';
+  state.inputLocked = true;
+  state.enemy = null;
+  sfxDeath();
+
+  const pathCount = {
+    crimson: state.relics.filter(r => r.path === 'crimson').length,
+    frost: state.relics.filter(r => r.path === 'frost').length,
+    void: state.relics.filter(r => r.path === 'void').length,
+  };
+
+  const dominant = Object.entries(pathCount).sort((a, b) => b[1] - a[1])[0];
+  const pathName = dominant[0] === 'crimson' ? '烈焰之道' : dominant[0] === 'frost' ? '冰霜之道' : '虚空之道';
+
+  gameoverStats.innerHTML = `
+    <p>到达层级：<b>第 ${state.floor} 层</b></p>
+    <p>总得分：<b>${state.score.toLocaleString()}</b></p>
+    <p>击杀敌人：<b>${state.kills}</b></p>
+    <p>遗物收集：<b>${state.relics.length} 件</b></p>
+    <p>主导流派：<b>${pathName} (${dominant[1]}件)</b></p>
+    <p style="margin-top:8px;font-size:0.78em;color:#666">${getDeathQuote(state.floor)}</p>
+  `;
+
+  gameScreen.classList.add('hidden');
+  gameoverScreen.classList.remove('hidden');
+  screenShake(2);
+}
+
+function getDeathQuote(floor) {
+  if (floor <= 2) return '深渊才刚刚睁开眼睛...';
+  if (floor <= 5) return '黑暗中有无数双眼睛注视着你倒下。';
+  if (floor <= 8) return '你的名字将被深渊记住——尽管这毫无意义。';
+  if (floor <= 12) return '你已经走了很远，但深渊没有尽头。';
+  return '传说级的陨落。深渊会为你沉默片刻。';
+}
+
+// ==================== Init ====================
+titleScreen.classList.remove('hidden');
+gameScreen.classList.add('hidden');
+relicScreen.classList.add('hidden');
+gameoverScreen.classList.add('hidden');
+state.gameState = 'title';
+</script>
+</body>
+</html>
