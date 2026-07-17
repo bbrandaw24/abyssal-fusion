@@ -1017,14 +1017,13 @@ function updateRelicBar() {
 
 // ==================== Enemy System ====================
 const ENEMY_POOL = [
-  // HP 大幅提高 + 间隔拉长 → 让玩家合成到 1024/2048 再打
-  { name: '虚空史莱姆', emoji: '👾', hp: 100, atk: 3, interval: 6, special: null, specialDesc: null, intentIcon: '🗡️' },
-  { name: '骨铠骑士',   emoji: '💀', hp: 200, atk: 4, interval: 5, special: 'block', specialDesc: '偶尔格挡一次合并伤害', intentIcon: '⚔️' },
-  { name: '暗影编织者', emoji: '🕷️', hp: 320, atk: 5, interval: 5, special: 'curse', specialDesc: '诅咒最弱的符文使其减半', intentIcon: '🕸️' },
-  { name: '深渊炎魔',   emoji: '🔥', hp: 500, atk: 7, interval: 4, special: 'burn',  specialDesc: '每回合灼烧你 3 点生命', intentIcon: '🔥' },
-  { name: '虚空领主',   emoji: '👁️', hp: 800, atk: 9, interval: 4, special: 'chaos', specialDesc: '随机打乱你的符文位置', intentIcon: '🌀' },
-  { name: '深渊巨兽',   emoji: '🐉', hp: 1200, atk: 11, interval: 4, special: 'curse', specialDesc: '诅咒最弱的符文使其减半', intentIcon: '💀' },
-  { name: '终焉之核',   emoji: '☄️', hp: 2048, atk: 15, interval: 5, special: 'chaos', specialDesc: '随机打乱你的符文位置', intentIcon: '💫' },
+  { name: '虚空史莱姆', emoji: '👾', hp: 300, atk: 3, interval: 6, special: null, specialDesc: null, intentIcon: '🗡️' },
+  { name: '骨铠骑士',   emoji: '💀', hp: 600, atk: 4, interval: 5, special: 'block', specialDesc: '偶尔格挡一次合并伤害', intentIcon: '⚔️' },
+  { name: '暗影编织者', emoji: '🕷️', hp: 960, atk: 5, interval: 5, special: 'curse', specialDesc: '诅咒最弱的符文使其减半', intentIcon: '🕸️' },
+  { name: '深渊炎魔',   emoji: '🔥', hp: 1500, atk: 7, interval: 4, special: 'burn',  specialDesc: '每回合灼烧你 3 点生命', intentIcon: '🔥' },
+  { name: '虚空领主',   emoji: '👁️', hp: 2400, atk: 9, interval: 4, special: null, specialDesc: null, intentIcon: '🌀' },
+  { name: '深渊巨兽',   emoji: '🐉', hp: 3600, atk: 11, interval: 4, special: 'curse', specialDesc: '诅咒最弱的符文使其减半', intentIcon: '💀' },
+  { name: '终焉之核',   emoji: '☄️', hp: 6144, atk: 15, interval: 5, special: null, specialDesc: null, intentIcon: '💫' },
 ];
 
 function createEnemy(floor) {
