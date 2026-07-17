@@ -933,6 +933,7 @@ function updateEnemyHP() {
   if (!state.enemy) return;
   const pct = Math.max(0, state.enemy.hp / state.enemy.maxHp * 100);
   enemyHpBar.style.width = pct + '%';
+  enemyName.textContent = state.enemy.name + '  ' + Math.max(0, Math.round(state.enemy.hp)) + '/' + state.enemy.maxHp;
 }
 
 function updateScore() {
@@ -949,32 +950,35 @@ function updateRelicBar() {
 
 // ==================== Enemy System ====================
 const ENEMY_POOL = [
-  // Floor template: {name, emoji, hp, atk, interval, special, specialDesc}
-  { name: '虚空史莱姆', emoji: '👾', hp: 45, atk: 6, interval: 4, special: null, specialDesc: null, intentIcon: '🗡️' },
-  { name: '骨铠骑士', emoji: '💀', hp: 70, atk: 10, interval: 3, special: 'block', specialDesc: '偶尔格挡一次合并伤害', intentIcon: '⚔️' },
-  { name: '暗影编织者', emoji: '🕷️', hp: 100, atk: 14, interval: 3, special: 'curse', specialDesc: '诅咒最弱的符文使其减半', intentIcon: '🕸️' },
-  { name: '深渊炎魔', emoji: '🔥', hp: 150, atk: 20, interval: 2, special: 'burn', specialDesc: '每回合灼烧你 3 点生命', intentIcon: '🔥' },
-  { name: '虚空领主', emoji: '👁️', hp: 220, atk: 26, interval: 2, special: 'chaos', specialDesc: '随机打乱你的符文位置', intentIcon: '🌀' },
+  // name, emoji, hp, atk, interval, special, specialDesc, intentIcon
+  // 降攻增血：让玩家有更多回合合并大数值
+  { name: '虚空史莱姆', emoji: '👾', hp: 55, atk: 4, interval: 5, special: null, specialDesc: null, intentIcon: '🗡️' },
+  { name: '骨铠骑士', emoji: '💀', hp: 90, atk: 6, interval: 4, special: 'block', specialDesc: '偶尔格挡一次合并伤害', intentIcon: '⚔️' },
+  { name: '暗影编织者', emoji: '🕷️', hp: 130, atk: 8, interval: 4, special: 'curse', specialDesc: '诅咒最弱的符文使其减半', intentIcon: '🕸️' },
+  { name: '深渊炎魔', emoji: '🔥', hp: 180, atk: 10, interval: 3, special: 'burn', specialDesc: '每回合灼烧你 3 点生命', intentIcon: '🔥' },
+  { name: '虚空领主', emoji: '👁️', hp: 260, atk: 13, interval: 3, special: 'chaos', specialDesc: '随机打乱你的符文位置', intentIcon: '🌀' },
 ];
 
 function createEnemy(floor) {
   const idx = Math.min(floor - 1, ENEMY_POOL.length - 1);
   const base = ENEMY_POOL[idx];
 
-  // Scale beyond pool
-  let scale = 1;
+  // Scale beyond pool (gentler curve)
+  let hpScale = 1, atkScale = 1;
   if (floor > ENEMY_POOL.length) {
     const extra = floor - ENEMY_POOL.length;
-    scale = 1 + extra * 0.35;
+    hpScale = 1 + extra * 0.25;
+    atkScale = 1 + extra * 0.15;
   }
 
+  const scaledHp = Math.round(base.hp * hpScale);
   return {
     name: floor > ENEMY_POOL.length ? base.name + ' ' + '★'.repeat(floor - ENEMY_POOL.length + 1) : base.name,
     emoji: base.emoji,
-    hp: Math.round(base.hp * scale),
-    maxHp: Math.round(base.hp * scale),
-    atk: Math.round(base.atk * scale),
-    interval: Math.max(2, base.interval - Math.floor((floor - 1) / 5)),
+    hp: scaledHp,
+    maxHp: scaledHp,
+    atk: Math.round(base.atk * atkScale),
+    interval: Math.max(2, base.interval),
     special: base.special,
     specialDesc: base.specialDesc,
     intentIcon: base.intentIcon,
