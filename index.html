@@ -147,6 +147,23 @@ body {
   white-space: nowrap;
 }
 #shield-indicator span { margin-left: 2px; }
+.music-toggle {
+  background: rgba(123,92,255,0.1);
+  border: 1px solid rgba(123,92,255,0.3);
+  border-radius: 8px;
+  width: 32px; height: 32px;
+  font-size: 1em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+}
+.music-toggle:hover { background: rgba(123,92,255,0.25); border-color: rgba(123,92,255,0.6); }
+.music-toggle.muted { background: rgba(255,60,40,0.1); border-color: rgba(255,60,40,0.3); }
 
 /* Enemy Area */
 #enemy-area {
@@ -460,6 +477,7 @@ body {
       <div class="header-item">得分 <span id="score-num">0</span></div>
       <div class="header-item">击杀 <span id="kills-num">0</span></div>
       <div class="hp-container">
+        <button id="music-btn" class="music-toggle" onclick="toggleMusicUI()" title="音乐开关">🔊</button>
         <span id="shield-indicator" style="display:none">🛡️<span id="shield-val">0</span></span>
         <div class="hp-bar-bg"><div id="hp-bar" class="hp-bar" style="width:100%"></div></div>
         <span id="hp-text">100/100</span>
@@ -540,6 +558,149 @@ function sfxClear() {
 function sfxDeath() {
   playTone(200, 'sawtooth', 0.3, 0.06, -100);
   setTimeout(() => playTone(100, 'sawtooth', 0.4, 0.08, -50), 200);
+}
+
+// ==================== Background Music (Procedural Ambient) ====================
+let musicNodes = null;
+let musicPlaying = false;
+let musicGain = null;
+
+function createMusic() {
+  if (!audioCtx) return;
+  const ctx = audioCtx;
+  const masterGain = ctx.createGain();
+  masterGain.gain.value = 0.06;
+  masterGain.connect(ctx.destination);
+  musicGain = masterGain;
+
+  const now = ctx.currentTime;
+
+  // === Bass Drone (deep rumble) ===
+  const bassOsc = ctx.createOscillator();
+  const bassGain = ctx.createGain();
+  bassOsc.type = 'sine';
+  bassOsc.frequency.value = 55; // A1
+  bassGain.gain.value = 0.5;
+  // Slow LFO on bass frequency
+  const bassLfo = ctx.createOscillator();
+  const bassLfoGain = ctx.createGain();
+  bassLfo.frequency.value = 0.08;
+  bassLfoGain.gain.value = 3;
+  bassLfo.connect(bassLfoGain);
+  bassLfoGain.connect(bassOsc.frequency);
+  bassLfo.start();
+  bassOsc.connect(bassGain);
+  bassGain.connect(masterGain);
+  bassOsc.start();
+
+  // === Pad layer: 3 detuned sine waves ===
+  const padFreqs = [110, 138.6, 165]; // A major-ish
+  const padNodes = [];
+  padFreqs.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.value = 0.15;
+    // Individual slow tremolo
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.frequency.value = 0.15 + i * 0.05;
+    lfoGain.gain.value = 0.08;
+    lfo.connect(lfoGain);
+    lfoGain.connect(gain.gain);
+    lfo.start();
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start();
+    padNodes.push({ osc, gain, lfo });
+  });
+
+  // === High shimmer (very faint) ===
+  const highOsc = ctx.createOscillator();
+  const highGain = ctx.createGain();
+  highOsc.type = 'triangle';
+  highOsc.frequency.value = 440;
+  highGain.gain.value = 0.03;
+  const highLfo = ctx.createOscillator();
+  const highLfoGain = ctx.createGain();
+  highLfo.frequency.value = 0.2;
+  highLfoGain.gain.value = 0.02;
+  highLfo.connect(highLfoGain);
+  highLfoGain.connect(highGain.gain);
+  highLfo.start();
+  highOsc.connect(highGain);
+  highGain.connect(masterGain);
+  highOsc.start();
+
+  // === Subtle noise texture ===
+  // (Using a low-passed sawtooth at very low volume)
+  const noiseOsc = ctx.createOscillator();
+  const noiseGain = ctx.createGain();
+  noiseOsc.type = 'sawtooth';
+  noiseOsc.frequency.value = 880;
+  noiseGain.gain.value = 0.02;
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = 'lowpass';
+  noiseFilter.frequency.value = 200;
+  noiseOsc.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(masterGain);
+  noiseOsc.start();
+
+  musicNodes = {
+    bassOsc, bassGain, bassLfo,
+    padNodes, highOsc, highGain, highLfo,
+    noiseOsc, noiseGain, noiseFilter,
+    masterGain,
+  };
+}
+
+function startMusic() {
+  if (!audioCtx) initAudio();
+  if (musicPlaying) return;
+  createMusic();
+  musicPlaying = true;
+}
+
+function stopMusic() {
+  if (!musicNodes || !audioCtx) return;
+  const nodes = musicNodes;
+  // Fade out
+  nodes.masterGain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+  setTimeout(() => {
+    try {
+      nodes.bassOsc.stop();
+      nodes.bassLfo.stop();
+      nodes.padNodes.forEach(p => { p.osc.stop(); p.lfo.stop(); });
+      nodes.highOsc.stop();
+      nodes.highLfo.stop();
+      nodes.noiseOsc.stop();
+    } catch(e) {}
+    musicNodes = null;
+    musicPlaying = false;
+  }, 600);
+}
+
+function toggleMusic() {
+  if (musicPlaying) {
+    stopMusic();
+    return false;
+  } else {
+    startMusic();
+    return true;
+  }
+}
+
+function toggleMusicUI() {
+  const btn = document.getElementById('music-btn');
+  if (toggleMusic()) {
+    btn.textContent = '🔊';
+    btn.classList.remove('muted');
+  } else {
+    btn.textContent = '🔇';
+    btn.classList.add('muted');
+  }
 }
 
 // ==================== Particle Engine ====================
@@ -1190,6 +1351,7 @@ function selectRelic(relic) {
 
   relicScreen.classList.add('hidden');
   gameScreen.classList.remove('hidden');
+  state.gameState = 'playing';
   state.inputLocked = false;
 
   // Next floor
@@ -1276,6 +1438,10 @@ function startGame() {
   gameScreen.classList.remove('hidden');
   state.gameState = 'playing';
 
+  startMusic();
+  const mb = document.getElementById('music-btn');
+  mb.textContent = '🔊';
+  mb.classList.remove('muted');
   startFloor();
 }
 
@@ -1574,6 +1740,7 @@ function gameOver() {
   state.gameState = 'gameover';
   state.inputLocked = true;
   state.enemy = null;
+  stopMusic();
   sfxDeath();
 
   const pathCount = {
