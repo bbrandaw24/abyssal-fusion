@@ -457,6 +457,10 @@ body {
 </head>
 <body>
 
+<audio id="bg-music" loop preload="auto" style="display:none">
+  <source src="https://chinesemusicworld.com/mp3lib/Guzheng-High-Mountain-and-Running-River-gao-shan-liu-shui.mp3" type="audio/mpeg">
+</audio>
+
 <canvas id="bg-canvas"></canvas>
 
 <div id="game-wrapper">
@@ -560,134 +564,30 @@ function sfxDeath() {
   setTimeout(() => playTone(100, 'sawtooth', 0.4, 0.08, -50), 200);
 }
 
-// ==================== Background Music (Procedural Ambient) ====================
-let musicNodes = null;
-let musicPlaying = false;
-let musicGain = null;
-
-function createMusic() {
-  if (!audioCtx) return;
-  const ctx = audioCtx;
-  const masterGain = ctx.createGain();
-  masterGain.gain.value = 0.06;
-  masterGain.connect(ctx.destination);
-  musicGain = masterGain;
-
-  const now = ctx.currentTime;
-
-  // === Bass Drone (deep rumble) ===
-  const bassOsc = ctx.createOscillator();
-  const bassGain = ctx.createGain();
-  bassOsc.type = 'sine';
-  bassOsc.frequency.value = 55; // A1
-  bassGain.gain.value = 0.5;
-  // Slow LFO on bass frequency
-  const bassLfo = ctx.createOscillator();
-  const bassLfoGain = ctx.createGain();
-  bassLfo.frequency.value = 0.08;
-  bassLfoGain.gain.value = 3;
-  bassLfo.connect(bassLfoGain);
-  bassLfoGain.connect(bassOsc.frequency);
-  bassLfo.start();
-  bassOsc.connect(bassGain);
-  bassGain.connect(masterGain);
-  bassOsc.start();
-
-  // === Pad layer: 3 detuned sine waves ===
-  const padFreqs = [110, 138.6, 165]; // A major-ish
-  const padNodes = [];
-  padFreqs.forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = freq;
-    gain.gain.value = 0.15;
-    // Individual slow tremolo
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    lfo.frequency.value = 0.15 + i * 0.05;
-    lfoGain.gain.value = 0.08;
-    lfo.connect(lfoGain);
-    lfoGain.connect(gain.gain);
-    lfo.start();
-    osc.connect(gain);
-    gain.connect(masterGain);
-    osc.start();
-    padNodes.push({ osc, gain, lfo });
-  });
-
-  // === High shimmer (very faint) ===
-  const highOsc = ctx.createOscillator();
-  const highGain = ctx.createGain();
-  highOsc.type = 'triangle';
-  highOsc.frequency.value = 440;
-  highGain.gain.value = 0.03;
-  const highLfo = ctx.createOscillator();
-  const highLfoGain = ctx.createGain();
-  highLfo.frequency.value = 0.2;
-  highLfoGain.gain.value = 0.02;
-  highLfo.connect(highLfoGain);
-  highLfoGain.connect(highGain.gain);
-  highLfo.start();
-  highOsc.connect(highGain);
-  highGain.connect(masterGain);
-  highOsc.start();
-
-  // === Subtle noise texture ===
-  // (Using a low-passed sawtooth at very low volume)
-  const noiseOsc = ctx.createOscillator();
-  const noiseGain = ctx.createGain();
-  noiseOsc.type = 'sawtooth';
-  noiseOsc.frequency.value = 880;
-  noiseGain.gain.value = 0.02;
-  const noiseFilter = ctx.createBiquadFilter();
-  noiseFilter.type = 'lowpass';
-  noiseFilter.frequency.value = 200;
-  noiseOsc.connect(noiseFilter);
-  noiseFilter.connect(noiseGain);
-  noiseGain.connect(masterGain);
-  noiseOsc.start();
-
-  musicNodes = {
-    bassOsc, bassGain, bassLfo,
-    padNodes, highOsc, highGain, highLfo,
-    noiseOsc, noiseGain, noiseFilter,
-    masterGain,
-  };
-}
+// ==================== Background Music ====================
+const bgMusic = document.getElementById('bg-music');
+let musicOn = false;
 
 function startMusic() {
-  if (!audioCtx) initAudio();
-  if (musicPlaying) return;
-  createMusic();
-  musicPlaying = true;
+  if (musicOn) return;
+  bgMusic.volume = 0.35;
+  bgMusic.play().catch(() => {}); // autoplay may be blocked, user gesture will trigger it
+  musicOn = true;
 }
 
 function stopMusic() {
-  if (!musicNodes || !audioCtx) return;
-  const nodes = musicNodes;
-  // Fade out
-  nodes.masterGain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
-  setTimeout(() => {
-    try {
-      nodes.bassOsc.stop();
-      nodes.bassLfo.stop();
-      nodes.padNodes.forEach(p => { p.osc.stop(); p.lfo.stop(); });
-      nodes.highOsc.stop();
-      nodes.highLfo.stop();
-      nodes.noiseOsc.stop();
-    } catch(e) {}
-    musicNodes = null;
-    musicPlaying = false;
-  }, 600);
+  bgMusic.pause();
+  musicOn = false;
 }
 
 function toggleMusic() {
-  if (musicPlaying) {
+  if (musicOn) {
     stopMusic();
     return false;
   } else {
     startMusic();
+    // If autoplay was blocked, try again on this user gesture
+    if (bgMusic.paused) bgMusic.play().catch(() => {});
     return true;
   }
 }
