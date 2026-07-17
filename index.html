@@ -565,43 +565,110 @@ function sfxDeath() {
 }
 
 // ==================== Background Music ====================
-const bgMusic = document.getElementById('bg-music');
-let musicOn = false;
+let currentTrack = 'guzheng';
+let bgmNodes = null;
 
-function startMusic() {
-  if (musicOn) return;
-  bgMusic.volume = 0.35;
-  bgMusic.play().catch(() => {}); // autoplay may be blocked, user gesture will trigger it
-  musicOn = true;
+function stopBGM() {
+  const a = document.getElementById('bg-music');
+  if (a) { a.pause(); a.currentTime = 0; }
+  if (bgmNodes) {
+    try { bgmNodes.oscs.forEach(o => { try { o.stop(); } catch(e) {} }); } catch(e) {}
+    if (bgmNodes._timer) clearTimeout(bgmNodes._timer);
+    bgmNodes = null;
+  }
+}
+
+function startGuzheng() {
+  stopBGM();
+  const a = document.getElementById('bg-music');
+  a.src = 'https://chinesemusicworld.com/mp3lib/Guzheng-High-Mountain-and-Running-River-gao-shan-liu-shui.mp3';
+  a.volume = 0.35; a.loop = true;
+  a.play().catch(() => {});
+  currentTrack = 'guzheng';
+}
+
+function startFade() {
+  stopBGM();
+  if (!audioCtx) initAudio();
+  const ctx = audioCtx, t0 = ctx.currentTime;
+  const mg = ctx.createGain(); mg.gain.value = 0.07; mg.connect(ctx.destination);
+
+  // Fade melody: D# minor pentatonic
+  const notes = [311,247,370,277, 311,247,370,277, 370,311,277,247, 311,370,277,247];
+  const beat = 0.48;
+  const oscs = [];
+
+  function playLoop(startT) {
+    notes.forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = (Math.random()-0.5)*12;
+      const s = startT + i * beat;
+      g.gain.setValueAtTime(0, s);
+      g.gain.linearRampToValueAtTime(0.05, s + 0.02);
+      g.gain.setValueAtTime(0.05, s + beat * 0.55);
+      g.gain.linearRampToValueAtTime(0, s + beat);
+      o.connect(g); g.connect(mg);
+      o.start(s); o.stop(s + beat + 0.05); oscs.push(o);
+      // Kick
+      if (i % 2 === 0) {
+        const ko = ctx.createOscillator(), kg = ctx.createGain();
+        ko.type = 'sine';
+        ko.frequency.setValueAtTime(150, s);
+        ko.frequency.exponentialRampToValueAtTime(35, s + 0.12);
+        kg.gain.setValueAtTime(0.12, s);
+        kg.gain.exponentialRampToValueAtTime(0.001, s + 0.18);
+        ko.connect(kg); kg.connect(mg);
+        ko.start(s); ko.stop(s + 0.22); oscs.push(ko);
+      }
+    });
+  }
+  playLoop(t0);
+
+  // Bass drone
+  const bo = ctx.createOscillator(), bg = ctx.createGain();
+  bo.type = 'sine'; bo.frequency.value = 77.8; bg.gain.value = 0.1;
+  bo.connect(bg); bg.connect(mg); bo.start(); oscs.push(bo);
+
+  // Loop
+  const dur = notes.length * beat;
+  const loop = () => {
+    if (currentTrack !== 'fade') return;
+    playLoop(ctx.currentTime + 0.05);
+    bgmNodes._timer = setTimeout(loop, dur * 1000 - 150);
+  };
+  bgmNodes = { oscs, _timer: null };
+  bgmNodes._timer = setTimeout(loop, dur * 1000 - 200);
+  currentTrack = 'fade';
+}
+
+function startMusic(track) {
+  if (!track && currentTrack === 'off') track = 'guzheng';
+  if (!track) track = currentTrack;
+  (track === 'fade') ? startFade() : startGuzheng();
 }
 
 function stopMusic() {
-  bgMusic.pause();
-  musicOn = false;
+  stopBGM();
+  currentTrack = 'off';
 }
 
-function toggleMusic() {
-  if (musicOn) {
-    stopMusic();
-    return false;
-  } else {
-    startMusic();
-    // If autoplay was blocked, try again on this user gesture
-    if (bgMusic.paused) bgMusic.play().catch(() => {});
-    return true;
-  }
+function cycleTrack() {
+  stopBGM();
+  if (currentTrack === 'guzheng') startFade();
+  else if (currentTrack === 'fade') { currentTrack = 'off'; }
+  else startGuzheng();
+  updateMusicButton();
 }
 
-function toggleMusicUI() {
+function updateMusicButton() {
   const btn = document.getElementById('music-btn');
-  if (toggleMusic()) {
-    btn.textContent = '🔊';
-    btn.classList.remove('muted');
-  } else {
-    btn.textContent = '🔇';
-    btn.classList.add('muted');
-  }
+  const icons = { guzheng: '🪕', fade: '🎧', off: '🔇' };
+  btn.textContent = icons[currentTrack] || '🔇';
+  btn.classList.toggle('muted', currentTrack === 'off');
+  btn.title = currentTrack === 'off' ? '音乐：关' : '音乐：' + (currentTrack === 'guzheng' ? '高山流水' : 'Fade');
 }
+
+function toggleMusicUI() { cycleTrack(); }
 
 // ==================== Particle Engine ====================
 const bgCanvas = document.getElementById('bg-canvas');
@@ -1343,10 +1410,8 @@ function startGame() {
   gameScreen.classList.remove('hidden');
   state.gameState = 'playing';
 
-  startMusic();
-  const mb = document.getElementById('music-btn');
-  mb.textContent = '🔊';
-  mb.classList.remove('muted');
+  startMusic('guzheng');
+  updateMusicButton();
   startFloor();
   spawnTile();
   spawnTile();
